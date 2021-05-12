@@ -17,12 +17,14 @@
 
 package org.compuscene.metrics.prometheus;
 
+import org.apache.lucene.index.Term;
 import org.elasticsearch.action.ClusterStatsData;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
 import org.elasticsearch.action.admin.cluster.node.stats.NodeStats;
 import org.elasticsearch.action.admin.indices.stats.CommonStats;
 import org.elasticsearch.action.admin.indices.stats.IndexStats;
 import org.elasticsearch.action.admin.indices.stats.IndicesStatsResponse;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.cluster.health.ClusterIndexHealth;
 import org.elasticsearch.cluster.node.DiscoveryNode.Role;
 import org.elasticsearch.http.HttpStats;
@@ -35,12 +37,18 @@ import org.elasticsearch.monitor.jvm.JvmStats;
 import org.elasticsearch.monitor.os.OsStats;
 import org.elasticsearch.monitor.process.ProcessStats;
 import org.elasticsearch.script.ScriptStats;
+import org.elasticsearch.search.aggregations.Aggregations;
+import org.elasticsearch.search.aggregations.bucket.histogram.InternalDateHistogram;
+import org.elasticsearch.search.aggregations.bucket.terms.Terms;
+import org.elasticsearch.search.aggregations.metrics.cardinality.Cardinality;
 import org.elasticsearch.threadpool.ThreadPoolStats;
 import org.elasticsearch.transport.TransportStats;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import io.prometheus.client.Summary;
 
@@ -79,6 +87,7 @@ public class PrometheusMetricsCollector {
         registerOsMetrics();
         registerFsMetrics();
         registerESSettings();
+        registerDocumentCountMetrics();
     }
 
     private void registerClusterMetrics() {
@@ -933,8 +942,34 @@ public class PrometheusMetricsCollector {
         }
     }
 
+    private void registerDocumentCountMetrics() {
+        catalog.registerClusterGauge("index_namespaces_total", "Total number of Namespaces");
+        catalog.registerClusterGauge("index_document_count", "Number of records against each namespace name", "namespace");
+    }
+
+    private void updateDocumentCountMetrics(SearchResponse response) {
+        // parse aggregation and do catalog.setClusterGauge()
+        try {
+            Aggregations aggregations = response.getAggregations();
+            InternalDateHistogram byHistogramAggregation = aggregations.get("Histogram");
+            List<InternalDateHistogram.Bucket> histogramBucket = byHistogramAggregation.getBuckets();
+            for (InternalDateHistogram.Bucket bucket : histogramBucket) {
+                Terms topNamespaceTerms = bucket.getAggregations().get("top_namespaces");
+                List<? extends Terms.Bucket> topNamespaces = topNamespaceTerms.getBuckets();
+                for (Terms.Bucket topNamespace : topNamespaces) {
+                    catalog.setClusterGauge("index_document_count",
+                            topNamespace.getDocCount(),
+                            topNamespace.getKey().toString());
+                }
+                Cardinality totalNamespaces = bucket.getAggregations().get("namespace_count");
+                catalog.setClusterGauge("index_namespaces_total", totalNamespaces.getValue());
+            }
+        } catch (Exception ignored) {}
+    }
+
     public void updateMetrics(ClusterHealthResponse clusterHealthResponse, NodeStats nodeStats,
-                              IndicesStatsResponse indicesStats, ClusterStatsData clusterStatsData) {
+                              IndicesStatsResponse indicesStats, ClusterStatsData clusterStatsData,
+                              SearchResponse searchResponse) {
         Summary.Timer timer = catalog.startSummaryTimer("metrics_generate_time_seconds");
 
         updateClusterMetrics(clusterHealthResponse);
@@ -956,6 +991,7 @@ public class PrometheusMetricsCollector {
         if (isPrometheusClusterSettings) {
             updateESSettings(clusterStatsData);
         }
+        updateDocumentCountMetrics(searchResponse);
 
         timer.observeDuration();
     }

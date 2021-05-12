@@ -20,6 +20,7 @@ It collects all relevant metrics and makes them available to Prometheus via the 
     - Circuit Breaker
 - Indices status
 - Cluster settings (selected [disk allocation settings](https://www.elastic.co/guide/en/elasticsearch/reference/master/disk-allocator.html) only)
+- Number of documents in indices per top OpenShift namespaces ([LOG-1075](https://issues.redhat.com/browse/LOG-1075): OCP specific metric)
 
 ## Compatibility matrix
 
@@ -139,12 +140,17 @@ Note that the plugin needs the following special permissions:
 If you have a lot of indices and think this data is irrelevant, you can disable in the main configuration file:
 
 ```
-prometheus.indices: false
+prometheus.indices: false  (default: true)
 ```
 
 To disable exporting cluster settings use:
 ```
-prometheus.cluster.settings: false
+prometheus.cluster.settings: false  (default: true)
+```
+
+To enable exporting OCP specific query metric use:
+```
+prometheus.query.metrics: true  (default: false)
 ```
 
 These settings can be also [updated dynamically](https://www.elastic.co/guide/en/elasticsearch/reference/master/cluster-update-settings.html).

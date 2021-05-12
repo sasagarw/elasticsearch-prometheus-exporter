@@ -23,6 +23,7 @@ import org.elasticsearch.action.admin.cluster.state.ClusterStateResponse;
 import org.elasticsearch.action.admin.indices.stats.IndicesStatsResponse;
 import org.elasticsearch.action.admin.indices.stats.PackageAccessHelper;
 import org.elasticsearch.action.admin.indices.stats.ShardStats;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.broadcast.BroadcastResponse;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -41,6 +42,7 @@ public class NodePrometheusMetricsResponse extends ActionResponse {
     private NodeStats nodeStats;
     @Nullable private IndicesStatsResponse indicesStats;
     private ClusterStatsData clusterStatsData = null;
+    private SearchResponse searchResponse = null;
 
     public NodePrometheusMetricsResponse(StreamInput in) throws IOException {
         super.readFrom(in);
@@ -54,11 +56,13 @@ public class NodePrometheusMetricsResponse extends ActionResponse {
                 Arrays.asList(br.getShardFailures())
         );
         clusterStatsData.readFrom(in);
+        searchResponse.readFrom(in);
     }
 
     public NodePrometheusMetricsResponse(ClusterHealthResponse clusterHealth, NodeStats nodesStats,
                                          @Nullable IndicesStatsResponse indicesStats,
                                          @Nullable ClusterStateResponse clusterStateResponse,
+                                         @Nullable SearchResponse searchResponse,
                                          Settings settings,
                                          ClusterSettings clusterSettings) {
         this.clusterHealth = clusterHealth;
@@ -67,6 +71,7 @@ public class NodePrometheusMetricsResponse extends ActionResponse {
         if (clusterStateResponse != null) {
             this.clusterStatsData = new ClusterStatsData(clusterStateResponse, settings, clusterSettings);
         }
+        this.searchResponse = searchResponse;
     }
 
     public ClusterHealthResponse getClusterHealth() {
@@ -87,6 +92,11 @@ public class NodePrometheusMetricsResponse extends ActionResponse {
         return this.clusterStatsData;
     }
 
+    @Nullable
+    public SearchResponse getSearchResponse() {
+        return this.searchResponse;
+    }
+
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
@@ -98,5 +108,6 @@ public class NodePrometheusMetricsResponse extends ActionResponse {
             out.writeArray(indicesStats.getShards());
         }
         clusterStatsData.writeTo(out);
+        searchResponse.writeTo(out);
     }
 }
