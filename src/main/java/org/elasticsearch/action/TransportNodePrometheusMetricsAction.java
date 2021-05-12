@@ -27,6 +27,8 @@ import org.elasticsearch.action.admin.cluster.state.ClusterStateRequest;
 import org.elasticsearch.action.admin.cluster.state.ClusterStateResponse;
 import org.elasticsearch.action.admin.indices.stats.IndicesStatsRequest;
 import org.elasticsearch.action.admin.indices.stats.IndicesStatsResponse;
+import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.action.support.HandledTransportAction;
 import org.elasticsearch.client.Client;
@@ -36,8 +38,20 @@ import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.xcontent.*;
+import org.elasticsearch.search.SearchModule;
+import org.elasticsearch.search.aggregations.Aggregations;
+import org.elasticsearch.search.aggregations.bucket.histogram.InternalDateHistogram;
+import org.elasticsearch.search.aggregations.bucket.terms.StringTerms;
+import org.elasticsearch.search.aggregations.bucket.terms.Terms;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.TransportService;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Transport action class for Prometheus Exporter plugin.
@@ -84,10 +98,13 @@ public class TransportNodePrometheusMetricsAction extends HandledTransportAction
         private NodesStatsResponse nodesStatsResponse = null;
         private IndicesStatsResponse indicesStatsResponse = null;
         private ClusterStateResponse clusterStateResponse = null;
+        private SearchResponse searchResponse = null;
 
         // read the state of prometheus dynamic settings only once at the beginning of the async request
         private boolean isPrometheusIndices = prometheusSettings.getPrometheusIndices();
         private boolean isPrometheusClusterSettings = prometheusSettings.getPrometheusClusterSettings();
+        private String prometheusQueryIndexPattern = prometheusSettings.getIndexPattern();
+        private String prometheusQueryBody = prometheusSettings.getQueryBody();
 
         // All the requests are executed in sequential non-blocking order.
         // It is implemented by wrapping each individual request with ActionListener
@@ -123,15 +140,48 @@ public class TransportNodePrometheusMetricsAction extends HandledTransportAction
 
         private void gatherRequests() {
             listener.onResponse(buildResponse(clusterHealthResponse, nodesStatsResponse, indicesStatsResponse,
-                    clusterStateResponse));
+                    clusterStateResponse, searchResponse));
         }
+
+        private ActionListener<SearchResponse> searchResponseActionListener =
+            new ActionListener<SearchResponse>() {
+                @Override
+                public void onResponse(SearchResponse response) {
+                    searchResponse = response;
+                    logger.info("Response: " + searchResponse.toString());
+                    gatherRequests();
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    listener.onFailure(new ElasticsearchException("Search request failed", e));
+                }
+            };
 
         private ActionListener<ClusterStateResponse> clusterStateResponseActionListener =
             new ActionListener<ClusterStateResponse>() {
                 @Override
                 public void onResponse(ClusterStateResponse response) {
                     clusterStateResponse = response;
-                    gatherRequests();
+                    logger.info("Index Pattern: " + prometheusQueryIndexPattern);
+                    logger.info("Query Body: " + prometheusQueryBody);
+
+                    SearchModule searchModule = new SearchModule(Settings.EMPTY,
+                            false, Collections.emptyList());
+                    SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+                    try (XContentParser parser = XContentFactory.xContent(XContentType.JSON)
+                            .createParser(new NamedXContentRegistry(searchModule.getNamedXContents()),
+                                    DeprecationHandler.THROW_UNSUPPORTED_OPERATION, prometheusQueryBody)) {
+                        searchSourceBuilder.parseXContent(parser);
+                        logger.info("Query: " + searchSourceBuilder.query().toString());
+                        logger.info("Aggs: " + searchSourceBuilder.aggregations().toString());
+                    } catch (IOException e) {
+                        logger.info("Error occurred in parsing: " + e.toString());
+                    }
+
+                    client.search(new SearchRequest(prometheusQueryIndexPattern).source(
+                            searchSourceBuilder
+                    ), searchResponseActionListener);
                 }
 
                 @Override
@@ -197,9 +247,10 @@ public class TransportNodePrometheusMetricsAction extends HandledTransportAction
         protected NodePrometheusMetricsResponse buildResponse(ClusterHealthResponse clusterHealth,
                                                               NodesStatsResponse nodesStats,
                                                               @Nullable IndicesStatsResponse indicesStats,
-                                                              @Nullable ClusterStateResponse clusterStateResponse) {
+                                                              @Nullable ClusterStateResponse clusterStateResponse,
+                                                              @Nullable SearchResponse searchResponse) {
             NodePrometheusMetricsResponse response = new NodePrometheusMetricsResponse(clusterHealth,
-                    nodesStats.getNodes().get(0), indicesStats, clusterStateResponse,
+                    nodesStats.getNodes().get(0), indicesStats, clusterStateResponse, searchResponse,
                     settings, clusterSettings);
             if (logger.isTraceEnabled()) {
                 logger.trace("Return response: [{}]", response);

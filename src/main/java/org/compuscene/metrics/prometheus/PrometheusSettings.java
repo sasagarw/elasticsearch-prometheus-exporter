@@ -21,6 +21,11 @@ import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Settings;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
 /**
  * A container to keep settings for prometheus up to date with cluster setting changes.
  *
@@ -40,30 +45,51 @@ public class PrometheusSettings {
     public static final Setting<Boolean> PROMETHEUS_INDICES =
             Setting.boolSetting("prometheus.indices", true,
                     Setting.Property.Dynamic, Setting.Property.NodeScope);
+    public static final Setting<String> PROMETHEUS_QUERY_INDEX_PATTERN =
+            Setting.simpleString("prometheus.query.index_pattern", "app-*",
+                    Setting.Property.Dynamic, Setting.Property.NodeScope);
+    public static final Setting<String> PROMETHEUS_QUERY_BODY =
+            Setting.simpleString("prometheus.query.body", "{}",
+                    Setting.Property.Dynamic, Setting.Property.NodeScope);
 
     private volatile boolean clusterSettings;
     private volatile boolean indices;
+    private volatile String indexPattern;
+    private volatile String queryBody;
 
     public PrometheusSettings(Settings settings, ClusterSettings clusterSettings) {
         setPrometheusClusterSettings(PROMETHEUS_CLUSTER_SETTINGS.get(settings));
         setPrometheusIndices(PROMETHEUS_INDICES.get(settings));
+        setPrometheusQueryIndexPattern(PROMETHEUS_QUERY_INDEX_PATTERN.get(settings));
+        setPrometheusQueryBody(PROMETHEUS_QUERY_BODY.get(settings));
         clusterSettings.addSettingsUpdateConsumer(PROMETHEUS_CLUSTER_SETTINGS, this::setPrometheusClusterSettings);
         clusterSettings.addSettingsUpdateConsumer(PROMETHEUS_INDICES, this::setPrometheusIndices);
+        clusterSettings.addSettingsUpdateConsumer(PROMETHEUS_QUERY_INDEX_PATTERN, this::setPrometheusQueryIndexPattern);
+        clusterSettings.addSettingsUpdateConsumer(PROMETHEUS_QUERY_BODY, this::setPrometheusQueryBody);
     }
 
     private void setPrometheusClusterSettings(boolean flag) {
         this.clusterSettings = flag;
     }
-
     private void setPrometheusIndices(boolean flag) {
         this.indices = flag;
     }
-
+    private void setPrometheusQueryIndexPattern(String indexPattern) {
+        this.indexPattern = indexPattern;
+    }
+    private void setPrometheusQueryBody(String body) {
+        this.queryBody = body;
+    }
     public boolean getPrometheusClusterSettings() {
         return this.clusterSettings;
     }
-
     public boolean getPrometheusIndices() {
         return this.indices;
+    }
+    public String getIndexPattern() {
+        return this.indexPattern;
+    }
+    public String getQueryBody() {
+        return this.queryBody;
     }
 }

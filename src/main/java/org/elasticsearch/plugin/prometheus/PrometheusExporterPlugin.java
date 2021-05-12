@@ -71,7 +71,9 @@ public class PrometheusExporterPlugin extends Plugin implements ActionPlugin {
     public List<Setting<?>> getSettings() {
         List<Setting<?>> settings = Arrays.asList(
                 PrometheusSettings.PROMETHEUS_CLUSTER_SETTINGS,
-                PrometheusSettings.PROMETHEUS_INDICES
+                PrometheusSettings.PROMETHEUS_INDICES,
+                PrometheusSettings.PROMETHEUS_QUERY_INDEX_PATTERN,
+                PrometheusSettings.PROMETHEUS_QUERY_BODY
         );
         return Collections.unmodifiableList(settings);
     }

@@ -23,6 +23,7 @@ import org.elasticsearch.action.admin.cluster.node.stats.NodeStats;
 import org.elasticsearch.action.admin.indices.stats.CommonStats;
 import org.elasticsearch.action.admin.indices.stats.IndexStats;
 import org.elasticsearch.action.admin.indices.stats.IndicesStatsResponse;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.cluster.health.ClusterIndexHealth;
 import org.elasticsearch.cluster.node.DiscoveryNode.Role;
 import org.elasticsearch.http.HttpStats;
@@ -35,6 +36,9 @@ import org.elasticsearch.monitor.jvm.JvmStats;
 import org.elasticsearch.monitor.os.OsStats;
 import org.elasticsearch.monitor.process.ProcessStats;
 import org.elasticsearch.script.ScriptStats;
+import org.elasticsearch.search.aggregations.Aggregations;
+import org.elasticsearch.search.aggregations.bucket.histogram.InternalDateHistogram;
+import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.threadpool.ThreadPoolStats;
 import org.elasticsearch.transport.TransportStats;
 
@@ -79,6 +83,7 @@ public class PrometheusMetricsCollector {
         registerOsMetrics();
         registerFsMetrics();
         registerESSettings();
+        registerCustomMetrics();
     }
 
     private void registerClusterMetrics() {
@@ -933,8 +938,27 @@ public class PrometheusMetricsCollector {
         }
     }
 
+    private void registerCustomMetrics() {
+        catalog.registerClusterGauge("index_heuristics", "Number of records against each namespace name", "namespace");
+    }
+
+    private void updateCustomMetrics(SearchResponse response) {
+        // parse aggregation and do catalog.setClusterGauge()
+        Aggregations aggregations = response.getAggregations();
+        InternalDateHistogram byCompanyAggregation = aggregations.get("Histogram");
+        List<InternalDateHistogram.Bucket> elasticBucket = byCompanyAggregation.getBuckets();
+        for (InternalDateHistogram.Bucket buck : elasticBucket) {
+            Terms terms = buck.getAggregations().get("top_namespaces");
+            List<? extends Terms.Bucket> top_namespace = terms.getBuckets();
+            for (Terms.Bucket term : top_namespace) {
+                catalog.setClusterGauge("index_heuristics", term.getDocCount(), term.getKey().toString());
+            }
+        }
+    }
+
     public void updateMetrics(ClusterHealthResponse clusterHealthResponse, NodeStats nodeStats,
-                              IndicesStatsResponse indicesStats, ClusterStatsData clusterStatsData) {
+                              IndicesStatsResponse indicesStats, ClusterStatsData clusterStatsData,
+                              SearchResponse searchResponse) {
         Summary.Timer timer = catalog.startSummaryTimer("metrics_generate_time_seconds");
 
         updateClusterMetrics(clusterHealthResponse);
@@ -956,6 +980,7 @@ public class PrometheusMetricsCollector {
         if (isPrometheusClusterSettings) {
             updateESSettings(clusterStatsData);
         }
+        updateCustomMetrics(searchResponse);
 
         timer.observeDuration();
     }
