@@ -945,13 +945,13 @@ public class PrometheusMetricsCollector {
     private void updateCustomMetrics(SearchResponse response) {
         // parse aggregation and do catalog.setClusterGauge()
         Aggregations aggregations = response.getAggregations();
-        InternalDateHistogram byCompanyAggregation = aggregations.get("Histogram");
-        List<InternalDateHistogram.Bucket> elasticBucket = byCompanyAggregation.getBuckets();
-        for (InternalDateHistogram.Bucket buck : elasticBucket) {
-            Terms terms = buck.getAggregations().get("top_namespaces");
-            List<? extends Terms.Bucket> top_namespace = terms.getBuckets();
-            for (Terms.Bucket term : top_namespace) {
-                catalog.setClusterGauge("index_heuristics", term.getDocCount(), term.getKey().toString());
+        InternalDateHistogram byHistogramAggregation = aggregations.get("Histogram");
+        List<InternalDateHistogram.Bucket> histogramBucket = byHistogramAggregation.getBuckets();
+        for (InternalDateHistogram.Bucket bucket : histogramBucket) {
+            Terms terms = bucket.getAggregations().get("top_namespaces");
+            List<? extends Terms.Bucket> top_namespaces = terms.getBuckets();
+            for (Terms.Bucket top_namespace : top_namespaces) {
+                catalog.setClusterGauge("index_heuristics", top_namespace.getDocCount(), top_namespace.getKey().toString());
             }
         }
     }
