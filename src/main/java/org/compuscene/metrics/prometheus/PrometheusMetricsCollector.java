@@ -946,20 +946,22 @@ public class PrometheusMetricsCollector {
     private void updateCustomMetrics(SearchResponse response) {
         // parse aggregation and do catalog.setClusterGauge()
         int totalNamespaces = 0;
-        Aggregations aggregations = response.getAggregations();
-        InternalDateHistogram byHistogramAggregation = aggregations.get("Histogram");
-        List<InternalDateHistogram.Bucket> histogramBucket = byHistogramAggregation.getBuckets();
-        for (InternalDateHistogram.Bucket bucket : histogramBucket) {
-            Terms terms = bucket.getAggregations().get("top_namespaces");
-            List<? extends Terms.Bucket> topNamespaces = terms.getBuckets();
-            for (Terms.Bucket topNamespace : topNamespaces) {
-                catalog.setClusterGauge("index_heuristics",
-                        topNamespace.getDocCount(),
-                        topNamespace.getKey().toString());
-                ++totalNamespaces;
+        try {
+            Aggregations aggregations = response.getAggregations();
+            InternalDateHistogram byHistogramAggregation = aggregations.get("Histogram");
+            List<InternalDateHistogram.Bucket> histogramBucket = byHistogramAggregation.getBuckets();
+            for (InternalDateHistogram.Bucket bucket : histogramBucket) {
+                Terms terms = bucket.getAggregations().get("top_namespaces");
+                List<? extends Terms.Bucket> topNamespaces = terms.getBuckets();
+                for (Terms.Bucket topNamespace : topNamespaces) {
+                    ++totalNamespaces;
+                    catalog.setClusterGauge("index_heuristics",
+                            topNamespace.getDocCount(),
+                            topNamespace.getKey().toString());
+                }
             }
-        }
-        catalog.setClusterGauge("index_namespaces_total", totalNamespaces);
+            catalog.setClusterGauge("index_namespaces_total", totalNamespaces);
+        } catch (Exception ignored) {}
     }
 
     public void updateMetrics(ClusterHealthResponse clusterHealthResponse, NodeStats nodeStats,

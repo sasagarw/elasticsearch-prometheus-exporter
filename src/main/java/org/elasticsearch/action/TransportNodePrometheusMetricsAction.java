@@ -167,21 +167,25 @@ public class TransportNodePrometheusMetricsAction extends HandledTransportAction
                     logger.info("Index Pattern: " + prometheusQueryIndexPattern);
                     logger.info("Query Body: " + prometheusQueryBody);
 
-                    SearchModule searchModule = new SearchModule(Settings.EMPTY,
-                            false, Collections.emptyList());
-                    SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-                    try (XContentParser parser = XContentFactory.xContent(XContentType.JSON)
-                            .createParser(new NamedXContentRegistry(searchModule.getNamedXContents()),
-                                    DeprecationHandler.THROW_UNSUPPORTED_OPERATION, prometheusQueryBody)) {
-                        searchSourceBuilder.parseXContent(parser);
-                        logger.info("Query: " + searchSourceBuilder.query().toString());
-                        logger.info("Aggs: " + searchSourceBuilder.aggregations().toString());
-                    } catch (IOException e) {
-                        logger.info("Error occurred in parsing: " + e.toString());
-                    }
+                    if (prometheusQueryBody.isEmpty()) {
+                        gatherRequests();
+                    } else {
+                        SearchModule searchModule = new SearchModule(Settings.EMPTY,
+                                false, Collections.emptyList());
+                        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+                        try (XContentParser parser = XContentFactory.xContent(XContentType.JSON)
+                                .createParser(new NamedXContentRegistry(searchModule.getNamedXContents()),
+                                        DeprecationHandler.THROW_UNSUPPORTED_OPERATION, prometheusQueryBody)) {
+                            searchSourceBuilder.parseXContent(parser);
+                            logger.info("Query: " + searchSourceBuilder.query().toString());
+                            logger.info("Aggs: " + searchSourceBuilder.aggregations().toString());
+                        } catch (IOException e) {
+                            logger.info("Error occurred in parsing: " + e.toString());
+                        }
 
-                    client.search(new SearchRequest(prometheusQueryIndexPattern.toArray(new String[0]),
-                            searchSourceBuilder), searchResponseActionListener);
+                        client.search(new SearchRequest(prometheusQueryIndexPattern.toArray(new String[0]),
+                                searchSourceBuilder), searchResponseActionListener);
+                    }
                 }
 
                 @Override

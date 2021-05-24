@@ -50,7 +50,7 @@ public class PrometheusSettings {
             Setting.listSetting("prometheus.query.index_pattern", Collections.emptyList(), Function.identity(),
                     Setting.Property.Dynamic, Setting.Property.NodeScope);
     public static final Setting<String> PROMETHEUS_QUERY_BODY =
-            Setting.simpleString("prometheus.query.body", "{}",
+            Setting.simpleString("prometheus.query.body", "",
                     Setting.Property.Dynamic, Setting.Property.NodeScope);
 
     private volatile boolean clusterSettings;
