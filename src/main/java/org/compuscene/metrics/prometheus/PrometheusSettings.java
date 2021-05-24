@@ -21,6 +21,7 @@ import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Settings;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -45,8 +46,8 @@ public class PrometheusSettings {
     public static final Setting<Boolean> PROMETHEUS_INDICES =
             Setting.boolSetting("prometheus.indices", true,
                     Setting.Property.Dynamic, Setting.Property.NodeScope);
-    public static final Setting<String> PROMETHEUS_QUERY_INDEX_PATTERN =
-            Setting.simpleString("prometheus.query.index_pattern", "app-*",
+    public static final Setting<List<String>> PROMETHEUS_QUERY_INDEX_PATTERN =
+            Setting.listSetting("prometheus.query.index_pattern", Collections.emptyList(), Function.identity(),
                     Setting.Property.Dynamic, Setting.Property.NodeScope);
     public static final Setting<String> PROMETHEUS_QUERY_BODY =
             Setting.simpleString("prometheus.query.body", "{}",
@@ -54,7 +55,7 @@ public class PrometheusSettings {
 
     private volatile boolean clusterSettings;
     private volatile boolean indices;
-    private volatile String indexPattern;
+    private volatile List<String> indexPattern;
     private volatile String queryBody;
 
     public PrometheusSettings(Settings settings, ClusterSettings clusterSettings) {
@@ -74,7 +75,8 @@ public class PrometheusSettings {
     private void setPrometheusIndices(boolean flag) {
         this.indices = flag;
     }
-    private void setPrometheusQueryIndexPattern(String indexPattern) {
+    private void setPrometheusQueryIndexPattern(List<String> indexPattern) {
+        this.indexPattern = new ArrayList<String>();
         this.indexPattern = indexPattern;
     }
     private void setPrometheusQueryBody(String body) {
@@ -86,7 +88,7 @@ public class PrometheusSettings {
     public boolean getPrometheusIndices() {
         return this.indices;
     }
-    public String getIndexPattern() {
+    public List<String> getIndexPattern() {
         return this.indexPattern;
     }
     public String getQueryBody() {

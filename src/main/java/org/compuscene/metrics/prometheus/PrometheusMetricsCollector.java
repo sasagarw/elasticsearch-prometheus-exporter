@@ -939,21 +939,27 @@ public class PrometheusMetricsCollector {
     }
 
     private void registerCustomMetrics() {
+        catalog.registerClusterGauge("index_namespaces_total", "Total number of Namespaces");
         catalog.registerClusterGauge("index_heuristics", "Number of records against each namespace name", "namespace");
     }
 
     private void updateCustomMetrics(SearchResponse response) {
         // parse aggregation and do catalog.setClusterGauge()
+        int totalNamespaces = 0;
         Aggregations aggregations = response.getAggregations();
         InternalDateHistogram byHistogramAggregation = aggregations.get("Histogram");
         List<InternalDateHistogram.Bucket> histogramBucket = byHistogramAggregation.getBuckets();
         for (InternalDateHistogram.Bucket bucket : histogramBucket) {
             Terms terms = bucket.getAggregations().get("top_namespaces");
-            List<? extends Terms.Bucket> top_namespaces = terms.getBuckets();
-            for (Terms.Bucket top_namespace : top_namespaces) {
-                catalog.setClusterGauge("index_heuristics", top_namespace.getDocCount(), top_namespace.getKey().toString());
+            List<? extends Terms.Bucket> topNamespaces = terms.getBuckets();
+            for (Terms.Bucket topNamespace : topNamespaces) {
+                catalog.setClusterGauge("index_heuristics",
+                        topNamespace.getDocCount(),
+                        topNamespace.getKey().toString());
+                ++totalNamespaces;
             }
         }
+        catalog.setClusterGauge("index_namespaces_total", totalNamespaces);
     }
 
     public void updateMetrics(ClusterHealthResponse clusterHealthResponse, NodeStats nodeStats,

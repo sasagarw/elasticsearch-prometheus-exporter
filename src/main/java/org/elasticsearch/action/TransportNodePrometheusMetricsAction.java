@@ -49,6 +49,7 @@ import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.TransportService;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -103,7 +104,7 @@ public class TransportNodePrometheusMetricsAction extends HandledTransportAction
         // read the state of prometheus dynamic settings only once at the beginning of the async request
         private boolean isPrometheusIndices = prometheusSettings.getPrometheusIndices();
         private boolean isPrometheusClusterSettings = prometheusSettings.getPrometheusClusterSettings();
-        private String prometheusQueryIndexPattern = prometheusSettings.getIndexPattern();
+        private List<String> prometheusQueryIndexPattern = prometheusSettings.getIndexPattern();
         private String prometheusQueryBody = prometheusSettings.getQueryBody();
 
         // All the requests are executed in sequential non-blocking order.
@@ -179,9 +180,8 @@ public class TransportNodePrometheusMetricsAction extends HandledTransportAction
                         logger.info("Error occurred in parsing: " + e.toString());
                     }
 
-                    client.search(new SearchRequest(prometheusQueryIndexPattern).source(
-                            searchSourceBuilder
-                    ), searchResponseActionListener);
+                    client.search(new SearchRequest(prometheusQueryIndexPattern.toArray(new String[0]),
+                            searchSourceBuilder), searchResponseActionListener);
                 }
 
                 @Override
