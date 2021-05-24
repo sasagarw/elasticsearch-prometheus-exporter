@@ -17,6 +17,7 @@
 
 package org.compuscene.metrics.prometheus;
 
+import org.apache.lucene.index.Term;
 import org.elasticsearch.action.ClusterStatsData;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
 import org.elasticsearch.action.admin.cluster.node.stats.NodeStats;
@@ -42,9 +43,11 @@ import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.threadpool.ThreadPoolStats;
 import org.elasticsearch.transport.TransportStats;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import io.prometheus.client.Summary;
 
@@ -940,7 +943,7 @@ public class PrometheusMetricsCollector {
 
     private void registerCustomMetrics() {
         catalog.registerClusterGauge("index_namespaces_total", "Total number of Namespaces");
-        catalog.registerClusterGauge("index_heuristics", "Number of records against each namespace name", "namespace");
+        catalog.registerClusterGauge("index_document_count", "Number of records against each namespace name", "namespace");
     }
 
     private void updateCustomMetrics(SearchResponse response) {
@@ -955,7 +958,7 @@ public class PrometheusMetricsCollector {
                 List<? extends Terms.Bucket> topNamespaces = terms.getBuckets();
                 for (Terms.Bucket topNamespace : topNamespaces) {
                     ++totalNamespaces;
-                    catalog.setClusterGauge("index_heuristics",
+                    catalog.setClusterGauge("index_document_count",
                             topNamespace.getDocCount(),
                             topNamespace.getKey().toString());
                 }
