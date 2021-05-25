@@ -86,7 +86,7 @@ public class PrometheusMetricsCollector {
         registerOsMetrics();
         registerFsMetrics();
         registerESSettings();
-        registerCustomMetrics();
+        registerDocumentCountMetrics();
     }
 
     private void registerClusterMetrics() {
@@ -941,12 +941,12 @@ public class PrometheusMetricsCollector {
         }
     }
 
-    private void registerCustomMetrics() {
+    private void registerDocumentCountMetrics() {
         catalog.registerClusterGauge("index_namespaces_total", "Total number of Namespaces");
         catalog.registerClusterGauge("index_document_count", "Number of records against each namespace name", "namespace");
     }
 
-    private void updateCustomMetrics(SearchResponse response) {
+    private void updateDocumentCountMetrics(SearchResponse response) {
         // parse aggregation and do catalog.setClusterGauge()
         int totalNamespaces = 0;
         try {
@@ -991,7 +991,7 @@ public class PrometheusMetricsCollector {
         if (isPrometheusClusterSettings) {
             updateESSettings(clusterStatsData);
         }
-        updateCustomMetrics(searchResponse);
+        updateDocumentCountMetrics(searchResponse);
 
         timer.observeDuration();
     }

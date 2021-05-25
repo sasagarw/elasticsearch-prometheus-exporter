@@ -1,0 +1,109 @@
+# Test that custom metrics are getting exposed correctly
+---
+"Expose custom metrics for document count and total namespaces":
+
+  # Create app-01 index with a document
+  - do:
+      index:
+        index:  app-01
+        type:   _doc
+        id:     1
+        body: {
+          "kubernetes": {
+            "namespace_name": "project1",
+            "pod_name": "json-log-generator",
+            "container_image": "docker.io/library/centos:centos7",
+            "pod_id": "a2ef35d6-7ebf-4fdc-a657-ab50abb61f00",
+            "host": "crc-fdm75-master-0",
+          },
+          "message": "I am exposing a custom metric",
+          "@timestamp": "2021-05-11T13:20:12.894345+00:00",
+        }
+
+  # Refresh the index so that the test doesn't fail because it might not see doc in the index.
+  - do:
+      indices.refresh:
+        index: []
+
+  # Set fielddata=true on [kubernetes.namespace_name] to enable fielddata on text fields.
+  - do:
+      indices.put_mapping:
+        index: app-01
+        type:  _doc
+        body: {
+          "properties": {
+            "kubernetes.namespace_name": {
+              "type": "text",
+              "fielddata": true
+            }
+          }
+        }
+  - match: { acknowledged: true }
+
+  # Let's start with just the default OOTB settings, this means
+  # there is empty query body.
+  - do:
+      cluster.get_settings:
+        flat_settings: true
+
+  - do:
+      prometheus.metrics: {}
+
+  # Verify the metrics are not exported now.
+  - match:
+      $body: |
+        /.*
+        \# \s HELP \s es_index_document_count (\s|\w|\d)+ \n
+        \# \s TYPE \s es_index_document_count \s gauge
+        (\n \# \s (HELP|TYPE).* | \s*)
+        /
+
+  - match:
+      $body: |
+        /.*
+        \# \s HELP \s es_index_namespaces_total (\s|\w|\d)+ \n
+        \# \s TYPE \s es_index_namespaces_total \s gauge
+        (\n \# \s (HELP|TYPE).* | \s*)
+        /
+
+  # Now put index pattern and a query body to transient settings
+  - do:
+      cluster.put_settings:
+        body:
+          transient:
+            prometheus.query.index_pattern:
+              - "app-*"
+            prometheus.query.body: "{\"size\":0,\"query\":{\"range\":{\"@timestamp\":{\"gte\":\"now-20d\",
+            \"lt\":\"now\"}}},\"aggs\":{\"Histogram\":{\"date_histogram\":{\"field\":\"@timestamp\",
+            \"interval\":\"hour\"},\"aggs\":{\"top_namespaces\":{\"terms\":{\"size\":1000,
+            \"order\":{\"_count\":\"desc\"},\"field\":\"kubernetes.namespace_name\"}}}}}}"
+        flat_settings: true
+  - match: { acknowledged: true }
+
+  - do:
+      cluster.get_settings:
+        flat_settings: true
+
+  - do:
+      prometheus.metrics: {}
+
+  # We get back some document count and total namespace metrics.
+  - match:
+      $body: |
+        /.*
+        \# \s HELP \s es_index_document_count (\s|\w|\d)+ \n
+        \# \s TYPE \s es_index_document_count \s gauge \n
+        es_index_document_count\{
+            cluster="PrometheusExporterITCluster",namespace="project1"
+        \,} \s 1\.0 \n?
+        .*/
+
+  - match:
+      $body: |
+        /.*
+        \# \s HELP \s es_index_namespaces_total (\s|\w|\d)+ \n
+        \# \s TYPE \s es_index_namespaces_total \s gauge \n
+        es_index_namespaces_total\{
+            cluster="PrometheusExporterITCluster"
+        \,} \s 1\.0 \n?
+        .*/
