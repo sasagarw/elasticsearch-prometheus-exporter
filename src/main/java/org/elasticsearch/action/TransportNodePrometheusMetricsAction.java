@@ -149,7 +149,6 @@ public class TransportNodePrometheusMetricsAction extends HandledTransportAction
                 @Override
                 public void onResponse(SearchResponse response) {
                     searchResponse = response;
-                    logger.info("Response: " + searchResponse.toString());
                     gatherRequests();
                 }
 
@@ -164,8 +163,6 @@ public class TransportNodePrometheusMetricsAction extends HandledTransportAction
                 @Override
                 public void onResponse(ClusterStateResponse response) {
                     clusterStateResponse = response;
-                    logger.info("Index Pattern: " + prometheusQueryIndexPattern);
-                    logger.info("Query Body: " + prometheusQueryBody);
 
                     if (prometheusQueryBody.isEmpty()) {
                         gatherRequests();
@@ -177,8 +174,6 @@ public class TransportNodePrometheusMetricsAction extends HandledTransportAction
                                 .createParser(new NamedXContentRegistry(searchModule.getNamedXContents()),
                                         DeprecationHandler.THROW_UNSUPPORTED_OPERATION, prometheusQueryBody)) {
                             searchSourceBuilder.parseXContent(parser);
-                            logger.info("Query: " + searchSourceBuilder.query().toString());
-                            logger.info("Aggs: " + searchSourceBuilder.aggregations().toString());
                         } catch (IOException e) {
                             logger.info("Error occurred in parsing: " + e.toString());
                         }
