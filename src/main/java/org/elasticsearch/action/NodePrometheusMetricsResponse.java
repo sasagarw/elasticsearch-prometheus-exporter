@@ -56,6 +56,7 @@ public class NodePrometheusMetricsResponse extends ActionResponse {
                 Arrays.asList(br.getShardFailures())
         );
         clusterStatsData.readFrom(in);
+        searchResponse.readFrom(in);
     }
 
     public NodePrometheusMetricsResponse(ClusterHealthResponse clusterHealth, NodeStats nodesStats,
@@ -107,5 +108,6 @@ public class NodePrometheusMetricsResponse extends ActionResponse {
             out.writeArray(indicesStats.getShards());
         }
         clusterStatsData.writeTo(out);
+        searchResponse.writeTo(out);
     }
 }

@@ -76,7 +76,6 @@ public class PrometheusSettings {
         this.indices = flag;
     }
     private void setPrometheusQueryIndexPattern(List<String> indexPattern) {
-        this.indexPattern = new ArrayList<String>();
         this.indexPattern = indexPattern;
     }
     private void setPrometheusQueryBody(String body) {
