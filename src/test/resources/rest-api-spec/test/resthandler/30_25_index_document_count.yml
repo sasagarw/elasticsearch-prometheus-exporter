@@ -2,6 +2,42 @@
 ---
 "Expose custom metrics for document count and total namespaces":
 
+  # create and push some index templates to make sure newly created indices
+  # will get some predefined index settings
+  # put a mapping for "kubernetes.namespace_name" to be keyword
+  - do:
+      indices.put_template:
+        name: "ocp-gen-app"
+        body: {
+          "order" : 0,
+          "index_patterns" : [
+            "app-*"
+          ],
+          "settings" : {
+            "index" : {
+              "number_of_shards" : "3",
+              "number_of_replicas" : "1"
+            }
+          },
+          "mappings" : {
+            "_doc": {
+              "properties": {
+                "kubernetes": {
+                  "properties": {
+                    "namespace_name": {
+                      "doc_values": true,
+                      "index": true,
+                      "norms": true,
+                      "type": "keyword"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+  - match: { acknowledged: true }
+
   # Create app-01 index with a document
   - do:
       index:
@@ -24,21 +60,6 @@
   - do:
       indices.refresh:
         index: []
-
-  # Set fielddata=true on [kubernetes.namespace_name] to enable fielddata on text fields.
-  - do:
-      indices.put_mapping:
-        index: app-01
-        type:  _doc
-        body: {
-          "properties": {
-            "kubernetes.namespace_name": {
-              "type": "text",
-              "fielddata": true
-            }
-          }
-        }
-  - match: { acknowledged: true }
 
   # Let's start with just the default OOTB settings, this means
   # there is empty query body.
