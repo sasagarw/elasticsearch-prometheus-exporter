@@ -40,6 +40,7 @@ import org.elasticsearch.script.ScriptStats;
 import org.elasticsearch.search.aggregations.Aggregations;
 import org.elasticsearch.search.aggregations.bucket.histogram.InternalDateHistogram;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
+import org.elasticsearch.search.aggregations.metrics.cardinality.Cardinality;
 import org.elasticsearch.threadpool.ThreadPoolStats;
 import org.elasticsearch.transport.TransportStats;
 
@@ -948,22 +949,21 @@ public class PrometheusMetricsCollector {
 
     private void updateDocumentCountMetrics(SearchResponse response) {
         // parse aggregation and do catalog.setClusterGauge()
-        int totalNamespaces = 0;
         try {
             Aggregations aggregations = response.getAggregations();
             InternalDateHistogram byHistogramAggregation = aggregations.get("Histogram");
             List<InternalDateHistogram.Bucket> histogramBucket = byHistogramAggregation.getBuckets();
             for (InternalDateHistogram.Bucket bucket : histogramBucket) {
-                Terms terms = bucket.getAggregations().get("top_namespaces");
-                List<? extends Terms.Bucket> topNamespaces = terms.getBuckets();
+                Terms topNamespaceTerms = bucket.getAggregations().get("top_namespaces");
+                List<? extends Terms.Bucket> topNamespaces = topNamespaceTerms.getBuckets();
                 for (Terms.Bucket topNamespace : topNamespaces) {
-                    ++totalNamespaces;
                     catalog.setClusterGauge("index_document_count",
                             topNamespace.getDocCount(),
                             topNamespace.getKey().toString());
                 }
+                Cardinality totalNamespaces = bucket.getAggregations().get("namespace_count");
+                catalog.setClusterGauge("index_namespaces_total", totalNamespaces.getValue());
             }
-            catalog.setClusterGauge("index_namespaces_total", totalNamespaces);
         } catch (Exception ignored) {}
     }
 

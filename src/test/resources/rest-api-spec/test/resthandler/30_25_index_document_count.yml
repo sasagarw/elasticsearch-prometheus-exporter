@@ -97,7 +97,8 @@
             prometheus.query.body: "{\"size\":0,\"query\":{\"range\":{\"@timestamp\":{\"gte\":\"now-1y\",
             \"lt\":\"now\"}}},\"aggs\":{\"Histogram\":{\"date_histogram\":{\"field\":\"@timestamp\",
             \"interval\":\"hour\"},\"aggs\":{\"top_namespaces\":{\"terms\":{\"size\":1000,
-            \"order\":{\"_count\":\"desc\"},\"field\":\"kubernetes.namespace_name\"}}}}}}"
+            \"order\":{\"_count\":\"desc\"},\"field\":\"kubernetes.namespace_name\"}},
+            \"namespace_count\":{\"cardinality\":{\"field\":\"kubernetes.namespace_name\"}}}}}}"
         flat_settings: true
   - match: { acknowledged: true }
 
