@@ -1,0 +1,143 @@
+# Test that custom metrics are getting exposed correctly
+---
+"Expose custom metrics for document count and total namespaces":
+
+  # create and push some index templates to make sure newly created indices
+  # will get some predefined index settings
+  # put a mapping for "kubernetes.namespace_name" to be keyword
+  - do:
+      indices.put_template:
+        name: "ocp-gen-app"
+        body: {
+          "order" : 0,
+          "index_patterns" : [
+            "app-*"
+          ],
+          "settings" : {
+            "index" : {
+              "number_of_shards" : "3",
+              "number_of_replicas" : "1"
+            }
+          },
+          "mappings" : {
+            "_doc": {
+              "properties": {
+                "kubernetes": {
+                  "properties": {
+                    "namespace_name": {
+                      "doc_values": true,
+                      "index": true,
+                      "norms": true,
+                      "type": "keyword"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+  - match: { acknowledged: true }
+
+  # Create app-01 index with a document
+  - do:
+      index:
+        index:  app-01
+        type:   _doc
+        id:     1
+        body: {
+          "kubernetes": {
+            "namespace_name": "project1",
+            "pod_name": "json-log-generator",
+            "container_image": "docker.io/library/centos:centos7",
+            "pod_id": "a2ef35d6-7ebf-4fdc-a657-ab50abb61f00",
+            "host": "crc-fdm75-master-0",
+          },
+          "message": "I am exposing a custom metric",
+          "@timestamp": "2001-01-01T00:00:01",
+        }
+
+  # Refresh the index so that the test doesn't fail because it might not see doc in the index.
+  - do:
+      indices.refresh:
+        index: []
+
+  # The @datetime field is already mapped as a date.
+  # We can pass a long value into it now, and it will be automatically converted to the date value.
+  - do:
+      update:
+        index:  app-01
+        type:   _doc
+        id :    1
+        body: {
+          "script": "ctx._source['@timestamp'] = System.currentTimeMillis()"
+        }
+
+  - do:
+      indices.refresh:
+        index: []
+
+  # Let's start with just the default OOTB settings, this means
+  # there is empty query body.
+  - do:
+      cluster.get_settings:
+        flat_settings: true
+
+  - do:
+      prometheus.metrics: {}
+
+  # Verify the metrics are not exported now.
+  - match:
+      $body: |
+        /.*
+        \# \s HELP \s es_index_document_count (\s|\w|\d)+ \n
+        \# \s TYPE \s es_index_document_count \s gauge
+        (\n \# \s (HELP|TYPE).* | \s*)
+        /
+
+  - match:
+      $body: |
+        /.*
+        \# \s HELP \s es_index_namespaces_total (\s|\w|\d)+ \n
+        \# \s TYPE \s es_index_namespaces_total \s gauge
+        (\n \# \s (HELP|TYPE).* | \s*)
+        /
+
+  # Now enable query metrics
+  # ... and at the same time disable export of cluster settings in metrics
+  # (this is to verify individual prometheus settings do not clash with each other)
+  - do:
+      cluster.put_settings:
+        body:
+          transient:
+            prometheus.query.metrics: true
+            prometheus.cluster.settings: false
+        flat_settings: true
+  - match: { acknowledged: true }
+
+  - do:
+      cluster.get_settings:
+        flat_settings: true
+
+  - do:
+      prometheus.metrics: {}
+
+  # We get back some document count and total namespace metrics.
+  - match:
+      $body: |
+        /.*
+        \# \s HELP \s es_index_document_count (\s|\w|\d)+ \n
+        \# \s TYPE \s es_index_document_count \s gauge \n
+        es_index_document_count\{
+            cluster="PrometheusExporterITCluster",namespace="project1"
+        \,} \s 1\.0 \n?
+        .*/
+
+  - match:
+      $body: |
+        /.*
+        \# \s HELP \s es_index_namespaces_total (\s|\w|\d)+ \n
+        \# \s TYPE \s es_index_namespaces_total \s gauge \n
+        es_index_namespaces_total\{
+            cluster="PrometheusExporterITCluster"
+        \,} \s 1\.0 \n?
+        .*/

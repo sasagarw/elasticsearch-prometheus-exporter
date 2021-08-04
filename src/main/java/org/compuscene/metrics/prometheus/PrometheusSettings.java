@@ -40,30 +40,39 @@ public class PrometheusSettings {
     public static final Setting<Boolean> PROMETHEUS_INDICES =
             Setting.boolSetting("prometheus.indices", true,
                     Setting.Property.Dynamic, Setting.Property.NodeScope);
+    public static final Setting<Boolean> PROMETHEUS_QUERY_METRICS =
+            Setting.boolSetting("prometheus.query.metrics", false,
+                    Setting.Property.Dynamic, Setting.Property.NodeScope);
 
     private volatile boolean clusterSettings;
     private volatile boolean indices;
+    private volatile boolean queryMetrics;
 
     public PrometheusSettings(Settings settings, ClusterSettings clusterSettings) {
         setPrometheusClusterSettings(PROMETHEUS_CLUSTER_SETTINGS.get(settings));
         setPrometheusIndices(PROMETHEUS_INDICES.get(settings));
+        setPrometheusQueryMetrics(PROMETHEUS_QUERY_METRICS.get(settings));
         clusterSettings.addSettingsUpdateConsumer(PROMETHEUS_CLUSTER_SETTINGS, this::setPrometheusClusterSettings);
         clusterSettings.addSettingsUpdateConsumer(PROMETHEUS_INDICES, this::setPrometheusIndices);
+        clusterSettings.addSettingsUpdateConsumer(PROMETHEUS_QUERY_METRICS, this::setPrometheusQueryMetrics);
     }
 
     private void setPrometheusClusterSettings(boolean flag) {
         this.clusterSettings = flag;
     }
-
     private void setPrometheusIndices(boolean flag) {
         this.indices = flag;
     }
-
+    private void setPrometheusQueryMetrics(boolean flag) {
+        this.queryMetrics = flag;
+    }
     public boolean getPrometheusClusterSettings() {
         return this.clusterSettings;
     }
-
     public boolean getPrometheusIndices() {
         return this.indices;
+    }
+    public boolean getPrometheusQueryMetrics() {
+        return this.queryMetrics;
     }
 }

@@ -45,6 +45,10 @@ thirdPartyAudit.enabled = false
 
 // license header checks can be disabled
 licenseHeaders.enabled = true
+tasks.named("licenseHeaders").configure {
+    // Exclude JSON files (including those in resources).
+    excludes << '**/*.json'
+}
 
 // No unit tests in this plugin
 unitTest.enabled = false
@@ -101,7 +105,12 @@ esplugin {
     classname pluginClassname
 }
 
+// The default ES distribution that is downloaded for testing includes only basic set of modules and plugins.
+// Painless language is among missing plugins. This plugin uses Painless in unit tests hence we must
+// instruct the testing framework to download the "ZIP" distribution that comes with full set of plugins.
+// See https://discuss.elastic.co/t/painless-unit-testing/83317/7
 integTestCluster {
+    distribution = "zip"
     numNodes = 2
     clusterName = "PrometheusExporterITCluster"
 }
