@@ -951,19 +951,15 @@ public class PrometheusMetricsCollector {
         // parse aggregation and do catalog.setClusterGauge()
         try {
             Aggregations aggregations = response.getAggregations();
-            InternalDateHistogram byHistogramAggregation = aggregations.get("Histogram");
-            List<InternalDateHistogram.Bucket> histogramBucket = byHistogramAggregation.getBuckets();
-            for (InternalDateHistogram.Bucket bucket : histogramBucket) {
-                Terms topNamespaceTerms = bucket.getAggregations().get("top_namespaces");
+                Terms topNamespaceTerms = aggregations.get("top_namespaces");
                 List<? extends Terms.Bucket> topNamespaces = topNamespaceTerms.getBuckets();
                 for (Terms.Bucket topNamespace : topNamespaces) {
                     catalog.setClusterGauge("index_document_count",
                             topNamespace.getDocCount(),
                             topNamespace.getKey().toString());
                 }
-                Cardinality totalNamespaces = bucket.getAggregations().get("namespace_count");
+                Cardinality totalNamespaces = aggregations.get("namespace_count");
                 catalog.setClusterGauge("index_namespaces_total", totalNamespaces.getValue());
-            }
         } catch (Exception ignored) {}
     }
 
